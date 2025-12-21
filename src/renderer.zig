@@ -1,8 +1,8 @@
 const std = @import("std");
 const rl = @import("raylib");
 const layout_mod = @import("layout.zig");
-const Layout = layout_mod.Layout;
-const Node = layout_mod.Node;
+const Layout = @import("main.zig").Layout;
+const Node = Layout.Node;
 const configs = @import("configs.zig");
 
 const SizingAxis = layout_mod.SizingAxis;
@@ -29,7 +29,7 @@ const type_colors = struct {
 pub fn render(layout: *const Layout, mouse_x: i32, mouse_y: i32) void {
     if (layout.root == .none) return;
 
-    var stack: [256]Node.Handle = undefined;
+    var stack: [256]layout_mod.Handle = undefined;
     var stack_len: usize = 1;
     stack[0] = layout.root;
 
@@ -63,7 +63,7 @@ pub fn render(layout: *const Layout, mouse_x: i32, mouse_y: i32) void {
         }
 
         // Push children in reverse order so they render left-to-right
-        var children: [256]Node.Handle = undefined;
+        var children: [256]layout_mod.Handle = undefined;
         var child_count: usize = 0;
         var it = layout.children(handle);
         while (it.next(layout)) |child_handle| {
@@ -92,12 +92,12 @@ pub fn render(layout: *const Layout, mouse_x: i32, mouse_y: i32) void {
     }
 }
 
-fn getDepthColor(layout: *const Layout, handle: Node.Handle) rl.Color {
+fn getDepthColor(layout: *const Layout, handle: layout_mod.Handle) rl.Color {
     const depth = calculateDepth(layout, handle);
     return depth_colors[depth % depth_colors.len];
 }
 
-fn calculateDepth(layout: *const Layout, handle: Node.Handle) u32 {
+fn calculateDepth(layout: *const Layout, handle: layout_mod.Handle) u32 {
     var depth: u32 = 0;
     var parent = layout.get(handle).parent;
     while (parent != .none) {
@@ -107,15 +107,15 @@ fn calculateDepth(layout: *const Layout, handle: Node.Handle) u32 {
     return depth;
 }
 
-pub fn findNodeAt(layout: *const Layout, x: i32, y: i32) ?Node.Handle {
+pub fn findNodeAt(layout: *const Layout, x: i32, y: i32) ?layout_mod.Handle {
     if (layout.root == .none) return null;
 
     const fx: f32 = @floatFromInt(x);
     const fy: f32 = @floatFromInt(y);
 
-    var result: ?Node.Handle = null;
+    var result: ?layout_mod.Handle = null;
 
-    var stack: [256]Node.Handle = undefined;
+    var stack: [256]layout_mod.Handle = undefined;
     var stack_len: usize = 1;
     stack[0] = layout.root;
 
@@ -142,7 +142,7 @@ pub fn findNodeAt(layout: *const Layout, x: i32, y: i32) ?Node.Handle {
     return result;
 }
 
-fn drawNodeTooltip(layout: *const Layout, node: *const Node, handle: Node.Handle, x: i32, y: i32) void {
+fn drawNodeTooltip(layout: *const Layout, node: *const Node, handle: layout_mod.Handle, x: i32, y: i32) void {
     var buff: [2048]u8 = undefined;
     var fba = std.heap.FixedBufferAllocator.init(&buff);
     const gpa = fba.allocator();
@@ -156,22 +156,24 @@ fn drawNodeTooltip(layout: *const Layout, node: *const Node, handle: Node.Handle
     // Basic info
     lines.append(gpa, std.fmt.allocPrintSentinel(gpa, "Node #{d}", .{idx}, 0) catch "?") catch {};
     lines.append(gpa, std.fmt.allocPrintSentinel(gpa, "Depth: {d}", .{depth}, 0) catch "?") catch {};
-    lines.append(gpa, std.fmt.allocPrintSentinel(gpa, "Pos: ({d:.0}, {d:.0})", .{ bb.pos.x, bb.pos.y }, 0) catch "?") catch {};
-    lines.append(gpa, std.fmt.allocPrintSentinel(gpa, "Size: {d:.0} x {d:.0}", .{ bb.size.width, bb.size.height }, 0) catch "?") catch {};
+    lines.append(gpa, std.fmt.allocPrintSentinel(gpa, "Pos  : ({d:.0}, {d:.0})", .{ bb.pos.x, bb.pos.y }, 0) catch "?") catch {};
+    lines.append(gpa, std.fmt.allocPrintSentinel(gpa, "Size : {d:.0} x {d:.0}", .{ bb.size.width, bb.size.height }, 0) catch "?") catch {};
+    lines.append(gpa, std.fmt.allocPrintSentinel(gpa, "min  : {d:.0} x {d:.0}", .{ @min(9999, bb.min_size.width), @min(9999, bb.min_size.height) }, 0) catch "?") catch {};
+    lines.append(gpa, std.fmt.allocPrintSentinel(gpa, "max  : {d:.0} x {d:.0}", .{ @min(9999, bb.max_size.width), @min(9999, bb.max_size.height) }, 0) catch "?") catch {};
 
     // Config-specific info
-    lines.append(gpa, std.fmt.allocPrintSentinel(gpa, "Direction: {s}", .{@tagName(node.config.direction)}, 0) catch "?") catch {};
-    lines.append(gpa, std.fmt.allocPrintSentinel(gpa, "Childgap: {d}", .{node.config.child_gap}, 0) catch "?") catch {};
-    if (node.config.sizing.width.type != .fit or node.config.sizing.height.type != .fit) {
-        lines.append(gpa, std.fmt.allocPrintSentinel(gpa, "Sizing: {s}/{s}", .{
-            @tagName(node.config.sizing.width.type),
-            @tagName(node.config.sizing.height.type),
-        }, 0) catch "?") catch {};
-    }
+    // lines.append(gpa, std.fmt.allocPrintSentinel(gpa, "Direction: {s}", .{@tagName(node.config.direction)}, 0) catch "?") catch {};
+    // lines.append(gpa, std.fmt.allocPrintSentinel(gpa, "Childgap: {d}", .{node.config.child_gap}, 0) catch "?") catch {};
+    // if (node.config.sizing.width.type != .fit or node.config.sizing.height.type != .fit) {
+    //     lines.append(gpa, std.fmt.allocPrintSentinel(gpa, "Sizing: {s}/{s}", .{
+    //         @tagName(node.config.sizing.width.type),
+    //         @tagName(node.config.sizing.height.type),
+    //     }, 0) catch "?") catch {};
+    // }
 
     // Draw tooltip
     const line_height: i32 = 18;
-    const tooltip_width: i32 = 220;
+    const tooltip_width: i32 = 100;
     const tooltip_height: i32 = @as(i32, @intCast(lines.items.len)) * line_height + 10;
     const tooltip_x = @min(x + 15, @as(i32, @intCast(rl.getScreenWidth())) - tooltip_width - 5);
     const tooltip_y = @min(y + 15, @as(i32, @intCast(rl.getScreenHeight())) - tooltip_height - 5);
