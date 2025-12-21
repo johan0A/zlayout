@@ -297,13 +297,11 @@ pub const Layout = struct {
                     const child = self.get(child_handle);
 
                     if (parent.config.direction != axis) {
-                        const child_sizing = switch (axis) {
-                            .x => child.config.sizing.width,
-                            .y => child.config.sizing.height,
-                        };
-                        if (child_sizing.type == .grow) {
-                            const child_size = child.box.size.axis(axis);
-                            child_size.* = @min(available, child.box.max_size.axis(axis).*);
+                        const child_size = child.box.size.axis(axis);
+                        const child_preferred = child.box.preferred_size.axis(axis).*;
+
+                        if (child_size.* < child_preferred) {
+                            child_size.* = @min(available, child_preferred);
                         }
                     }
 
