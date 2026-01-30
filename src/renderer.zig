@@ -2,7 +2,7 @@ const std = @import("std");
 const rl = @import("raylib");
 const layout_mod = @import("layout.zig");
 const Layout = @import("main.zig").Layout;
-const Node = Layout.Node;
+const Node = layout_mod.BoxTree.Node;
 const configs = @import("configs.zig");
 
 const SizingAxis = layout_mod.SizingAxis;
@@ -27,17 +27,14 @@ const type_colors = struct {
 };
 
 pub fn render(layout: *const Layout, mouse_x: i32, mouse_y: i32) void {
-    if (layout.root == .none) return;
-
     var stack: [256]layout_mod.Handle = undefined;
     var stack_len: usize = 1;
-    stack[0] = layout.root;
+    stack[0] = layout.tree.root;
 
     while (stack_len > 0) {
         stack_len -= 1;
         const handle = stack[stack_len];
-        const node = layout.get(handle);
-        const bb = node.box;
+        const bb = layout.getBox(handle);
 
         const fill_color = getDepthColor(layout, handle);
 
@@ -79,8 +76,7 @@ pub fn render(layout: *const Layout, mouse_x: i32, mouse_y: i32) void {
 
     // Hover highlight and tooltip
     if (findNodeAt(layout, mouse_x, mouse_y)) |hovered_handle| {
-        const node = layout.get(hovered_handle);
-        const bb = node.box;
+        const bb = layout.getBox(hovered_handle);
 
         rl.drawRectangleLinesEx(
             .{ .x = bb.pos.x, .y = bb.pos.y, .width = bb.size.width, .height = bb.size.height },
@@ -88,6 +84,7 @@ pub fn render(layout: *const Layout, mouse_x: i32, mouse_y: i32) void {
             rl.Color.yellow,
         );
 
+        const node = layout.getNode(hovered_handle);
         drawNodeTooltip(layout, node, hovered_handle, mouse_x, mouse_y);
     }
 }
@@ -99,17 +96,15 @@ fn getDepthColor(layout: *const Layout, handle: layout_mod.Handle) rl.Color {
 
 fn calculateDepth(layout: *const Layout, handle: layout_mod.Handle) u32 {
     var depth: u32 = 0;
-    var parent = layout.get(handle).parent;
+    var parent = layout.tree.getNode(handle).parent;
     while (parent != .none) {
         depth += 1;
-        parent = layout.get(parent).parent;
+        parent = layout.tree.getNode(parent).parent;
     }
     return depth;
 }
 
 pub fn findNodeAt(layout: *const Layout, x: i32, y: i32) ?layout_mod.Handle {
-    if (layout.root == .none) return null;
-
     const fx: f32 = @floatFromInt(x);
     const fy: f32 = @floatFromInt(y);
 
@@ -117,13 +112,12 @@ pub fn findNodeAt(layout: *const Layout, x: i32, y: i32) ?layout_mod.Handle {
 
     var stack: [256]layout_mod.Handle = undefined;
     var stack_len: usize = 1;
-    stack[0] = layout.root;
+    stack[0] = layout.tree.root;
 
     while (stack_len > 0) {
         stack_len -= 1;
         const handle = stack[stack_len];
-        const node = layout.get(handle);
-        const bb = node.box;
+        const bb = layout.getBox(handle);
 
         if (fx >= bb.pos.x and fx < bb.pos.x + bb.size.width and
             fy >= bb.pos.y and fy < bb.pos.y + bb.size.height)
@@ -172,7 +166,7 @@ fn drawNodeTooltip(layout: *const Layout, node: *const Node, handle: layout_mod.
 
     // Draw tooltip
     const line_height: i32 = 18;
-    const tooltip_width: i32 = 100;
+    const tooltip_width: i32 = 150;
     const tooltip_height: i32 = @as(i32, @intCast(lines.items.len)) * line_height + 10;
     const tooltip_x = @min(x + 15, @as(i32, @intCast(rl.getScreenWidth())) - tooltip_width - 5);
     const tooltip_y = @min(y + 15, @as(i32, @intCast(rl.getScreenHeight())) - tooltip_height - 5);

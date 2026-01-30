@@ -67,21 +67,21 @@ pub const Flex = struct {
     /// y => top to bottom
     axis: layout_mod.Axis = .x,
 
-    pub fn fitAxis(layout: anytype, handle: layout_mod.Handle, config: Flex, axis: layout_mod.Axis) void {
-        const node = layout.get(handle);
+    pub fn fitAxis(layout: BoxTree, handle: layout_mod.Handle, config: Flex, axis: layout_mod.Axis) void {
+        const node = layout.getBox(handle);
 
         const sizing = switch (axis) {
             .x => config.sizing.width,
             .y => config.sizing.height,
         };
 
-        const min_size = node.box.min_size.axis(axis);
-        const preferred_size = node.box.preferred_size.axis(axis);
+        const min_size = node.min_size.axis(axis);
+        const preferred_size = node.preferred_size.axis(axis);
 
         var it = layout.children(handle);
         while (it.next(layout)) |child_handle| {
-            const child = layout.get(child_handle);
-            const child_min = child.box.min_size.axis(axis).*;
+            const child = layout.getBox(child_handle);
+            const child_min = child.min_size.axis(axis).*;
             if (config.axis == axis) {
                 min_size.* += child_min;
             } else {
@@ -103,21 +103,21 @@ pub const Flex = struct {
         };
     }
 
-    pub fn sizeAxis(layout: anytype, handle: layout_mod.Handle, config: Flex, axis: layout_mod.Axis) void {
-        const parent = layout.get(handle);
+    pub fn sizeAxis(layout: BoxTree, handle: layout_mod.Handle, config: Flex, axis: layout_mod.Axis) void {
+        const parent = layout.getBox(handle);
 
-        const parent_size = parent.box.size.axis(axis).*;
+        const parent_size = parent.size.axis(axis).*;
         const padding = config.padding.axis(axis);
         const available = parent_size - padding;
 
         var it = layout.children(handle);
         while (it.next(layout)) |child_handle| {
-            const child = layout.get(child_handle);
-            const child_size = child.box.size.axis(axis);
-            const child_preferred = child.box.preferred_size.axis(axis).*;
+            const child = layout.getBox(child_handle);
+            const child_size = child.size.axis(axis);
+            const child_preferred = child.preferred_size.axis(axis).*;
 
             if (config.axis != axis and child_size.* < child_preferred) {
-                const child_min = child.box.min_size.axis(axis).*;
+                const child_min = child.min_size.axis(axis).*;
                 child_size.* = @max(child_min, @min(available, child_preferred));
             }
         }
@@ -129,9 +129,9 @@ pub const Flex = struct {
         var child_count: usize = 0;
         var it1 = layout.children(handle);
         while (it1.next(layout)) |child_handle| {
-            const child = layout.get(child_handle);
+            const child = layout.getBox(child_handle);
             child_count += 1;
-            remaining -= child.box.size.axis(axis).*;
+            remaining -= child.size.axis(axis).*;
         }
         remaining -= @as(f32, @floatFromInt(child_count -| 1)) * config.child_gap;
 
@@ -143,10 +143,10 @@ pub const Flex = struct {
             var second_smallest = std.math.floatMax(f32);
             var it2 = layout.children(handle);
             while (it2.next(layout)) |child_handle| {
-                const child = layout.get(child_handle);
+                const child = layout.getBox(child_handle);
 
-                const child_size = child.box.size.axis(axis).*;
-                const child_preferred = child.box.preferred_size.axis(axis).*;
+                const child_size = child.size.axis(axis).*;
+                const child_preferred = child.preferred_size.axis(axis).*;
 
                 if (child_size >= child_preferred) continue;
                 growable_count += 1;
@@ -167,8 +167,8 @@ pub const Flex = struct {
 
             var it3 = layout.children(handle);
             while (it3.next(layout)) |child_handle| {
-                const child = layout.get(child_handle);
-                const child_size = child.box.size.axis(axis);
+                const child = layout.getBox(child_handle);
+                const child_size = child.size.axis(axis);
                 if (child_size.* == smallest) {
                     child_size.* += size_to_add;
                     remaining -= size_to_add;
@@ -177,48 +177,49 @@ pub const Flex = struct {
         }
     }
 
-    pub fn position(layout: anytype, handle: layout_mod.Handle, config: Flex) void {
-        const parent = layout.get(handle);
+    pub fn position(layout: BoxTree, handle: layout_mod.Handle, config: Flex) void {
+        const parent = layout.getBox(handle);
         const direction = config.axis;
 
         var main_offset = switch (direction) {
-            .x => parent.box.pos.x + config.padding.left,
-            .y => parent.box.pos.y + config.padding.top,
+            .x => parent.pos.x + config.padding.left,
+            .y => parent.pos.y + config.padding.top,
         };
 
         var it = layout.children(handle);
         while (it.next(layout)) |child_handle| {
-            const child = layout.get(child_handle);
+            const child = layout.getBox(child_handle);
 
             switch (direction) {
                 .x => {
-                    child.box.pos.x = main_offset;
-                    main_offset += child.box.size.width + config.child_gap;
+                    child.pos.x = main_offset;
+                    main_offset += child.size.width + config.child_gap;
 
-                    const available_height = parent.box.size.height - config.padding.axis(.y);
+                    const available_height = parent.size.height - config.padding.axis(.y);
                     const cross_offset = switch (config.child_alignment.y) {
                         .top => 0,
-                        .center => (available_height - child.box.size.height) / 2,
-                        .bottom => available_height - child.box.size.height,
+                        .center => (available_height - child.size.height) / 2,
+                        .bottom => available_height - child.size.height,
                     };
-                    child.box.pos.y = parent.box.pos.y + config.padding.top + cross_offset;
+                    child.pos.y = parent.pos.y + config.padding.top + cross_offset;
                 },
                 .y => {
-                    child.box.pos.y = main_offset;
-                    main_offset += child.box.size.height + config.child_gap;
+                    child.pos.y = main_offset;
+                    main_offset += child.size.height + config.child_gap;
 
-                    const available_width = parent.box.size.width - config.padding.axis(.x);
+                    const available_width = parent.size.width - config.padding.axis(.x);
                     const cross_offset = switch (config.child_alignment.x) {
                         .left => 0,
-                        .center => (available_width - child.box.size.width) / 2,
-                        .right => available_width - child.box.size.width,
+                        .center => (available_width - child.size.width) / 2,
+                        .right => available_width - child.size.width,
                     };
-                    child.box.pos.x = parent.box.pos.x + config.padding.left + cross_offset;
+                    child.pos.x = parent.pos.x + config.padding.left + cross_offset;
                 },
             }
         }
     }
 };
 
-const layout_mod = @import("layout.zig");
 const std = @import("std");
+const layout_mod = @import("layout.zig");
+const BoxTree = layout_mod.BoxTree;
