@@ -18,7 +18,7 @@ pub fn main() !void {
     defer rl.closeWindow();
 
     while (!rl.windowShouldClose()) {
-        var ui = Layout.init(gpa.allocator());
+        var ui = Layout.init(gpa.allocator(), .{});
         defer ui.deinit();
         try demoLayout(&ui, @floatFromInt(rl.getRenderWidth()), @floatFromInt(rl.getRenderHeight()));
         try ui.calculateLayout();
@@ -161,12 +161,12 @@ fn demoLayout(ui: *Layout, width: f32, height: f32) !void {
             defer ui.close();
 
             {
-                _ = try ui.open(.{ .flex = .{
-                    .sizing = .{ .width = .grow, .height = .grow },
-                    .axis = .x,
-                    .child_gap = 20,
-                } });
-                defer ui.close();
+                // _ = try ui.open(.{ .flex = .{
+                //     .sizing = .{ .width = .grow, .height = .fit },
+                //     .axis = .x,
+                //     .child_gap = 20,
+                // } });
+                // defer ui.close();
 
                 {
                     // _ = try ui.open(.{ .flex = .{
@@ -182,35 +182,35 @@ fn demoLayout(ui: *Layout, width: f32, height: f32) !void {
                     // } });
                     // defer ui.close();
 
-                    for (0..15) |_| {
-                        // _ = try ui.open(.{ .flex = .{
-                        //     .sizing = .{ .width = .grow, .height = .fixed(48) },
-                        //     .axis = .x,
-                        //     .padding = .symmetric(12, 8),
-                        //     .child_gap = 12,
-                        //     .child_alignment = .{ .y = .center },
-                        // } });
-                        // defer ui.close();
+                    // for (0..15) |_| {
+                    //     // _ = try ui.open(.{ .flex = .{
+                    //     //     .sizing = .{ .width = .grow, .height = .fixed(48) },
+                    //     //     .axis = .x,
+                    //     //     .padding = .symmetric(12, 8),
+                    //     //     .child_gap = 12,
+                    //     //     .child_alignment = .{ .y = .center },
+                    //     // } });
+                    //     // defer ui.close();
 
-                        // _ = try ui.open(.{ .flex = .{
-                        //     .sizing = .{ .width = .fixed(32), .height = .fixed(32) },
-                        //     .padding = .all(16),
-                        // } });
-                        // ui.close();
+                    //     // _ = try ui.open(.{ .flex = .{
+                    //     //     .sizing = .{ .width = .fixed(32), .height = .fixed(32) },
+                    //     //     .padding = .all(16),
+                    //     // } });
+                    //     // ui.close();
 
-                        _ = try ui.open(.{ .flex = .{
-                            .sizing = .{ .width = .fixed(32), .height = .fixed(32) },
-                            .padding = .all(16),
-                        } });
-                        ui.close();
+                    //     _ = try ui.open(.{ .flex = .{
+                    //         .sizing = .{ .width = .fixed(32), .height = .fixed(32) },
+                    //         .padding = .all(16),
+                    //     } });
+                    //     ui.close();
 
-                        // _ = try ui.open(.{ .flex = .{
-                        //     .sizing = .{ .width = .grow },
-                        //     .axis = .y,
-                        //     .child_gap = 4,
-                        // } });
-                        // ui.close();
-                    }
+                    //     // _ = try ui.open(.{ .flex = .{
+                    //     //     .sizing = .{ .width = .grow },
+                    //     //     .axis = .y,
+                    //     //     .child_gap = 4,
+                    //     // } });
+                    //     // ui.close();
+                    // }
                 }
 
                 // _ = try ui.open(.{ .flex = .{
