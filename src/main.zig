@@ -18,7 +18,7 @@ pub fn main() !void {
     defer rl.closeWindow();
 
     while (!rl.windowShouldClose()) {
-        var ui = Layout.init(gpa.allocator(), .{});
+        var ui = Layout.init(gpa.allocator());
         defer ui.deinit();
         try demoLayout(&ui, @floatFromInt(rl.getRenderWidth()), @floatFromInt(rl.getRenderHeight()));
         try ui.calculateLayout();

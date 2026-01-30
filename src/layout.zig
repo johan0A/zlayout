@@ -26,7 +26,6 @@ pub const Box = struct {
     size: Size,
     preferred_size: Size,
     min_size: Size,
-    max_size: Size,
 
     pub const zero: Box = .{
         .complete = false,
@@ -34,7 +33,6 @@ pub const Box = struct {
         .size = .{ .width = 0, .height = 0 },
         .preferred_size = .{ .width = 0, .height = 0 },
         .min_size = .{ .width = 0, .height = 0 },
-        .max_size = .{ .width = 0, .height = 0 },
     };
 };
 
@@ -56,32 +54,6 @@ pub fn Layout(Config: type) type {
         free: std.ArrayListUnmanaged(Handle),
         open_stack: std.ArrayListUnmanaged(Handle),
         root: Handle,
-        contexts: Contexts,
-
-        const Contexts: type = blk: {
-            const fields = @typeInfo(Config).@"union".fields;
-
-            var contexts_fields: []const std.builtin.Type.StructField = &.{};
-            for (fields) |field| {
-                if (@hasDecl(field.type, "Context")) {
-                    contexts_fields = contexts_fields ++
-                        @as(@TypeOf(contexts_fields), &.{.{
-                            .name = field.name,
-                            .type = &field.type.Context,
-                            .default_value_ptr = null,
-                            .is_comptime = false,
-                            .alignment = @alignOf(&field.type.Context),
-                        }});
-                }
-            }
-
-            break :blk @Type(.{ .@"struct" = .{
-                .is_tuple = false,
-                .layout = .auto,
-                .decls = &.{},
-                .fields = contexts_fields,
-            } });
-        };
 
         pub const Node = struct {
             parent: Handle,
@@ -91,6 +63,8 @@ pub fn Layout(Config: type) type {
             config: Config,
             box: Box,
         };
+
+        const Self = @This();
 
         pub const ChildIterator = struct {
             current: Handle,
@@ -103,10 +77,8 @@ pub fn Layout(Config: type) type {
             }
         };
 
-        const Self = @This();
-
-        pub fn init(gpa: Allocator, contexts: Contexts) Self {
-            return .{ .gpa = gpa, .contexts = contexts, .free = .empty, .nodes = .empty, .open_stack = .empty, .root = .none };
+        pub fn init(gpa: Allocator) Self {
+            return .{ .gpa = gpa, .free = .empty, .nodes = .empty, .open_stack = .empty, .root = .none };
         }
 
         pub fn deinit(self: *Self) void {
@@ -198,9 +170,8 @@ pub fn Layout(Config: type) type {
                     if (visited) {
                         const parent = self.get(node_handle);
                         switch (parent.config) {
-                            inline else => |config_union, tag| {
-                                const context = if (@hasDecl(@TypeOf(config_union), "Context")) @field(self.contexts, @tagName(tag)) else {};
-                                @TypeOf(config_union).fitAxis(context, self, node_handle, config_union, axis);
+                            inline else => |config_union| {
+                                @TypeOf(config_union).fitAxis(self, node_handle, config_union, axis);
                             },
                         }
                         parent.box.size.axis(axis).* = parent.box.min_size.axis(axis).*;
@@ -227,9 +198,8 @@ pub fn Layout(Config: type) type {
 
                     const parent = self.get(parent_handle);
                     switch (parent.config) {
-                        inline else => |config_union, tag| {
-                            const context = if (@hasDecl(@TypeOf(config_union), "Context")) @field(self.contexts, @tagName(tag)) else {};
-                            @TypeOf(config_union).sizeAxis(context, self, parent_handle, config_union, axis);
+                        inline else => |config_union| {
+                            @TypeOf(config_union).sizeAxis(self, parent_handle, config_union, axis);
                         },
                     }
                 }
@@ -275,9 +245,8 @@ pub fn Layout(Config: type) type {
 
                     const parent = self.get(parent_handle);
                     switch (parent.config) {
-                        inline else => |config_union, tag| {
-                            const context = if (@hasDecl(@TypeOf(config_union), "Context")) @field(self.contexts, @tagName(tag)) else {};
-                            @TypeOf(config_union).position(context, self, parent_handle, config_union);
+                        inline else => |config_union| {
+                            @TypeOf(config_union).position(self, parent_handle, config_union);
                         },
                     }
                 }

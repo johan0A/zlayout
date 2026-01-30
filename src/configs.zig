@@ -67,7 +67,7 @@ pub const Flex = struct {
     /// y => top to bottom
     axis: layout_mod.Axis = .x,
 
-    pub fn fitAxis(_: void, layout: anytype, handle: layout_mod.Handle, config: Flex, axis: layout_mod.Axis) void {
+    pub fn fitAxis(layout: anytype, handle: layout_mod.Handle, config: Flex, axis: layout_mod.Axis) void {
         const node = layout.get(handle);
 
         const sizing = switch (axis) {
@@ -76,10 +76,7 @@ pub const Flex = struct {
         };
 
         const min_size = node.box.min_size.axis(axis);
-        const max_size = node.box.max_size.axis(axis);
         const preferred_size = node.box.preferred_size.axis(axis);
-
-        max_size.* = sizing.max;
 
         var it = layout.children(handle);
         while (it.next(layout)) |child_handle| {
@@ -100,13 +97,13 @@ pub const Flex = struct {
 
         preferred_size.* = switch (sizing.type) {
             .fit => min_size.*,
-            .grow => max_size.*,
+            .grow => sizing.max,
             .fixed => |s| s,
             .percent => @panic("TODO"),
         };
     }
 
-    pub fn sizeAxis(_: void, layout: anytype, handle: layout_mod.Handle, config: Flex, axis: layout_mod.Axis) void {
+    pub fn sizeAxis(layout: anytype, handle: layout_mod.Handle, config: Flex, axis: layout_mod.Axis) void {
         const parent = layout.get(handle);
 
         const parent_size = parent.box.size.axis(axis).*;
@@ -180,7 +177,7 @@ pub const Flex = struct {
         }
     }
 
-    pub fn position(_: void, layout: anytype, handle: layout_mod.Handle, config: Flex) void {
+    pub fn position(layout: anytype, handle: layout_mod.Handle, config: Flex) void {
         const parent = layout.get(handle);
         const direction = config.axis;
 

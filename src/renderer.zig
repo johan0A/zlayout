@@ -159,7 +159,6 @@ fn drawNodeTooltip(layout: *const Layout, node: *const Node, handle: layout_mod.
     lines.append(gpa, std.fmt.allocPrintSentinel(gpa, "Pos  : ({d:.0}, {d:.0})", .{ bb.pos.x, bb.pos.y }, 0) catch "?") catch {};
     lines.append(gpa, std.fmt.allocPrintSentinel(gpa, "Size : {d:.0} x {d:.0}", .{ bb.size.width, bb.size.height }, 0) catch "?") catch {};
     lines.append(gpa, std.fmt.allocPrintSentinel(gpa, "min  : {d:.0} x {d:.0}", .{ @min(9999, bb.min_size.width), @min(9999, bb.min_size.height) }, 0) catch "?") catch {};
-    lines.append(gpa, std.fmt.allocPrintSentinel(gpa, "max  : {d:.0} x {d:.0}", .{ @min(9999, bb.max_size.width), @min(9999, bb.max_size.height) }, 0) catch "?") catch {};
 
     // Config-specific info
     // lines.append(gpa, std.fmt.allocPrintSentinel(gpa, "Direction: {s}", .{@tagName(node.config.direction)}, 0) catch "?") catch {};
