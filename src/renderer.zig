@@ -2,7 +2,7 @@ const std = @import("std");
 const rl = @import("raylib");
 const layout_mod = @import("layout.zig");
 const Layout = @import("main.zig").Layout;
-const Node = layout_mod.BoxTree.Node;
+const Node = layout_mod.Node;
 const configs = @import("configs.zig");
 
 const SizingAxis = layout_mod.SizingAxis;
@@ -29,7 +29,7 @@ const type_colors = struct {
 pub fn render(layout: *const Layout, mouse_x: i32, mouse_y: i32) void {
     var stack: [256]layout_mod.Handle = undefined;
     var stack_len: usize = 1;
-    stack[0] = layout.tree.root;
+    stack[0] = layout.root;
 
     while (stack_len > 0) {
         stack_len -= 1;
@@ -96,10 +96,10 @@ fn getDepthColor(layout: *const Layout, handle: layout_mod.Handle) rl.Color {
 
 fn calculateDepth(layout: *const Layout, handle: layout_mod.Handle) u32 {
     var depth: u32 = 0;
-    var parent = layout.tree.getNode(handle).parent;
+    var parent = layout.getNode(handle).parent;
     while (parent != .none) {
         depth += 1;
-        parent = layout.tree.getNode(parent).parent;
+        parent = layout.getNode(parent).parent;
     }
     return depth;
 }
@@ -112,7 +112,7 @@ pub fn findNodeAt(layout: *const Layout, x: i32, y: i32) ?layout_mod.Handle {
 
     var stack: [256]layout_mod.Handle = undefined;
     var stack_len: usize = 1;
-    stack[0] = layout.tree.root;
+    stack[0] = layout.root;
 
     while (stack_len > 0) {
         stack_len -= 1;

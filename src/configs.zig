@@ -67,16 +67,16 @@ pub const Flex = struct {
     /// y => top to bottom
     axis: layout_mod.Axis = .x,
 
-    pub fn fitAxis(layout: BoxTree, handle: layout_mod.Handle, config: Flex, axis: layout_mod.Axis) void {
-        const node = layout.getBox(handle);
+    pub fn fitAxis(layout: LayoutView, handle: layout_mod.Handle, config: Flex, axis: layout_mod.Axis) void {
+        const box = layout.getBox(handle);
 
         const sizing = switch (axis) {
             .x => config.sizing.width,
             .y => config.sizing.height,
         };
 
-        const min_size = node.min_size.axis(axis);
-        const preferred_size = node.preferred_size.axis(axis);
+        const min_size = box.min_size.axis(axis);
+        const preferred_size = box.preferred_size.axis(axis);
 
         var it = layout.children(handle);
         while (it.next(layout)) |child_handle| {
@@ -103,7 +103,7 @@ pub const Flex = struct {
         };
     }
 
-    pub fn sizeAxis(layout: BoxTree, handle: layout_mod.Handle, config: Flex, axis: layout_mod.Axis) void {
+    pub fn sizeAxis(layout: LayoutView, handle: layout_mod.Handle, config: Flex, axis: layout_mod.Axis) void {
         const parent = layout.getBox(handle);
 
         const parent_size = parent.size.axis(axis).*;
@@ -177,7 +177,7 @@ pub const Flex = struct {
         }
     }
 
-    pub fn position(layout: BoxTree, handle: layout_mod.Handle, config: Flex) void {
+    pub fn position(layout: LayoutView, handle: layout_mod.Handle, config: Flex) void {
         const parent = layout.getBox(handle);
         const direction = config.axis;
 
@@ -222,4 +222,4 @@ pub const Flex = struct {
 
 const std = @import("std");
 const layout_mod = @import("layout.zig");
-const BoxTree = layout_mod.BoxTree;
+const LayoutView = layout_mod.LayoutView;
