@@ -34,7 +34,7 @@ pub fn render(layout: *const Layout, mouse_x: i32, mouse_y: i32) void {
     while (stack_len > 0) {
         stack_len -= 1;
         const handle = stack[stack_len];
-        const bb = layout.getBox(handle);
+        const bb = layout.getNode(handle).box;
 
         const fill_color = getDepthColor(layout, handle);
 
@@ -76,7 +76,7 @@ pub fn render(layout: *const Layout, mouse_x: i32, mouse_y: i32) void {
 
     // Hover highlight and tooltip
     if (findNodeAt(layout, mouse_x, mouse_y)) |hovered_handle| {
-        const bb = layout.getBox(hovered_handle);
+        const bb = layout.getNode(hovered_handle).box;
 
         rl.drawRectangleLinesEx(
             .{ .x = bb.pos.x, .y = bb.pos.y, .width = bb.size.width, .height = bb.size.height },
@@ -117,7 +117,7 @@ pub fn findNodeAt(layout: *const Layout, x: i32, y: i32) ?layout_mod.Handle {
     while (stack_len > 0) {
         stack_len -= 1;
         const handle = stack[stack_len];
-        const bb = layout.getBox(handle);
+        const bb = layout.getNode(handle).box;
 
         if (fx >= bb.pos.x and fx < bb.pos.x + bb.size.width and
             fy >= bb.pos.y and fy < bb.pos.y + bb.size.height)

@@ -67,8 +67,8 @@ pub const Flex = struct {
     /// y => top to bottom
     axis: layout_mod.Axis = .x,
 
-    pub fn fitAxis(layout: LayoutView, handle: layout_mod.Handle, config: Flex, axis: layout_mod.Axis) void {
-        const box = layout.getBox(handle);
+    pub fn fitAxis(layout: *const Layout, handle: layout_mod.Handle, config: *const Flex, axis: layout_mod.Axis) void {
+        const box = &layout.getNode(handle).box;
 
         const sizing = switch (axis) {
             .x => config.sizing.width,
@@ -80,7 +80,7 @@ pub const Flex = struct {
 
         var it = layout.children(handle);
         while (it.next(layout)) |child_handle| {
-            const child = layout.getBox(child_handle);
+            const child = &layout.getNode(child_handle).box;
             const child_min = child.min_size.axis(axis).*;
             if (config.axis == axis) {
                 min_size.* += child_min;
@@ -103,8 +103,8 @@ pub const Flex = struct {
         };
     }
 
-    pub fn sizeAxis(layout: LayoutView, handle: layout_mod.Handle, config: Flex, axis: layout_mod.Axis) void {
-        const parent = layout.getBox(handle);
+    pub fn sizeAxis(layout: *const Layout, handle: layout_mod.Handle, config: *const Flex, axis: layout_mod.Axis) void {
+        const parent = &layout.getNode(handle).box;
 
         const parent_size = parent.size.axis(axis).*;
         const padding = config.padding.axis(axis);
@@ -112,7 +112,7 @@ pub const Flex = struct {
 
         var it = layout.children(handle);
         while (it.next(layout)) |child_handle| {
-            const child = layout.getBox(child_handle);
+            const child = &layout.getNode(child_handle).box;
             const child_size = child.size.axis(axis);
             const child_preferred = child.preferred_size.axis(axis).*;
 
@@ -129,7 +129,7 @@ pub const Flex = struct {
         var child_count: usize = 0;
         var it1 = layout.children(handle);
         while (it1.next(layout)) |child_handle| {
-            const child = layout.getBox(child_handle);
+            const child = &layout.getNode(child_handle).box;
             child_count += 1;
             remaining -= child.size.axis(axis).*;
         }
@@ -143,7 +143,7 @@ pub const Flex = struct {
             var second_smallest = std.math.floatMax(f32);
             var it2 = layout.children(handle);
             while (it2.next(layout)) |child_handle| {
-                const child = layout.getBox(child_handle);
+                const child = &layout.getNode(child_handle).box;
 
                 const child_size = child.size.axis(axis).*;
                 const child_preferred = child.preferred_size.axis(axis).*;
@@ -167,7 +167,7 @@ pub const Flex = struct {
 
             var it3 = layout.children(handle);
             while (it3.next(layout)) |child_handle| {
-                const child = layout.getBox(child_handle);
+                const child = &layout.getNode(child_handle).box;
                 const child_size = child.size.axis(axis);
                 if (child_size.* == smallest) {
                     child_size.* += size_to_add;
@@ -177,8 +177,8 @@ pub const Flex = struct {
         }
     }
 
-    pub fn position(layout: LayoutView, handle: layout_mod.Handle, config: Flex) void {
-        const parent = layout.getBox(handle);
+    pub fn position(layout: *const Layout, handle: layout_mod.Handle, config: *const Flex) void {
+        const parent = &layout.getNode(handle).box;
         const direction = config.axis;
 
         var main_offset = switch (direction) {
@@ -188,7 +188,7 @@ pub const Flex = struct {
 
         var it = layout.children(handle);
         while (it.next(layout)) |child_handle| {
-            const child = layout.getBox(child_handle);
+            const child = &layout.getNode(child_handle).box;
 
             switch (direction) {
                 .x => {
@@ -221,5 +221,6 @@ pub const Flex = struct {
 };
 
 const std = @import("std");
+
 const layout_mod = @import("layout.zig");
-const LayoutView = layout_mod.LayoutView;
+const Layout = layout_mod.Layout;

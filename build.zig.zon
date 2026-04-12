@@ -3,8 +3,8 @@
     .version = "0.0.1",
     .dependencies = .{
         .raylib_zig = .{
-            .url = "git+https://github.com/raylib-zig/raylib-zig?ref=devel#a4d18b2d1cf8fdddec68b5b084535fca0475f466",
-            .hash = "raylib_zig-5.6.0-dev-KE8REL5MBQAf3p497t52Xw9P7ojndIkVOWPXnLiLLw2P",
+            .url = "git+https://github.com/raylib-zig/raylib-zig#a93d7f04aeeb138efc0a08b406aad74cdea17c1c",
+            .hash = "raylib_zig-5.6.0-dev-KE8REJ9mBQC9yBwvG5aBLUgMaGVGyzbrpyGZNUyzwvUI",
         },
     },
     .minimum_zig_version = "0.15.2",

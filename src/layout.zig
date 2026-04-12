@@ -21,14 +21,13 @@ pub const Size = struct {
 };
 
 pub const Box = struct {
-    complete: bool,
     pos: Position,
     size: Size,
+
     preferred_size: Size,
     min_size: Size,
 
     pub const zero: Box = .{
-        .complete = false,
         .pos = .{ .x = 0, .y = 0 },
         .size = .{ .width = 0, .height = 0 },
         .preferred_size = .{ .width = 0, .height = 0 },
@@ -37,295 +36,222 @@ pub const Box = struct {
 };
 
 pub const Axis = enum { x, y };
-
-pub const Handle = enum(u32) {
-    none = std.math.maxInt(u32),
-    _,
-
-    pub fn from(idx: u32) Handle {
-        return @enumFromInt(idx);
-    }
-};
+pub const Handle = enum(u32) { none = std.math.maxInt(u32), _ };
 
 pub const Node = struct {
     parent: Handle,
     first_child: Handle,
     last_child: Handle,
     next_sibling: Handle,
+
     box: Box,
 
-    pub const empty: Node = .{
-        .parent = .none,
-        .first_child = .none,
-        .last_child = .none,
-        .next_sibling = .none,
-        .box = .zero,
+    config: *anyopaque,
+    vtable: *const VTable,
+
+    const VTable = struct {
+        fitAxis: *const fn (layout: *const Layout, handle: Handle, config: *const anyopaque, axis: Axis) void,
+        sizeAxis: *const fn (layout: *const Layout, handle: Handle, config: *const anyopaque, axis: Axis) void,
+        position: *const fn (layout: *const Layout, handle: Handle, config: *const anyopaque) void,
     };
 };
 
-pub const LayoutView = struct {
-    nodes: *std.ArrayListUnmanaged(Node),
-    free: *std.ArrayListUnmanaged(Handle),
+pub const Layout = struct {
+    nodes: std.ArrayListUnmanaged(Node),
+    free: std.ArrayListUnmanaged(Handle),
 
-    const Self = @This();
+    open_stack: std.ArrayListUnmanaged(Handle),
+
+    root: Handle,
+
+    gpa: std.mem.Allocator,
+
+    pub fn init(gpa: Allocator) Layout {
+        return .{
+            .gpa = gpa,
+            .nodes = .empty,
+            .free = .empty,
+            .open_stack = .empty,
+            .root = .none,
+        };
+    }
+
+    pub fn getNode(self: *const Layout, handle: Handle) *Node {
+        return &self.nodes.items[@intFromEnum(handle)];
+    }
+
+    pub fn getPreferedSize(self: *const Layout, handle: Handle, axis: Axis) f32 {
+        const node = self.getNode(handle);
+        node.vtable.sizeAxis(self, handle, node.config, axis);
+    }
 
     pub const ChildIterator = struct {
         current: Handle,
 
-        pub fn next(self: *ChildIterator, view: anytype) ?Handle {
+        pub fn next(self: *ChildIterator, layout: *const Layout) ?Handle {
             if (self.current == .none) return null;
-            const handle = self.current;
-            self.current = view.getNode(handle).next_sibling;
-            return handle;
+            defer self.current = layout.getNode(self.current).next_sibling;
+            return self.current;
         }
     };
 
-    pub fn getNode(self: Self, handle: Handle) *Node {
-        return &self.nodes.items[@intFromEnum(handle)];
-    }
-
-    pub fn getBox(self: Self, handle: Handle) *Box {
-        return &self.getNode(handle).box;
-    }
-
-    pub fn children(self: Self, handle: Handle) ChildIterator {
+    pub fn children(self: Layout, handle: Handle) ChildIterator {
         return .{ .current = self.getNode(handle).first_child };
     }
 
-    pub fn childCount(self: Self, handle: Handle) u32 {
+    pub fn childCount(self: *const Layout, handle: Handle) u32 {
         var count: u32 = 0;
         var iter = self.children(handle);
         while (iter.next(self)) |_| count += 1;
         return count;
     }
-};
 
-pub fn Layout(Config: type) type {
-    return struct {
-        gpa: Allocator,
-        nodes: std.ArrayListUnmanaged(Node),
-        free: std.ArrayListUnmanaged(Handle),
-        open_stack: std.ArrayListUnmanaged(Handle),
-        root: Handle,
-
-        configs: std.ArrayListUnmanaged(Config),
-
-        const Self = @This();
-
-        pub const ChildIterator = LayoutView.ChildIterator;
-
-        pub fn init(gpa: Allocator) Self {
-            return .{
-                .gpa = gpa,
-                .nodes = .empty,
-                .free = .empty,
-                .open_stack = .empty,
-                .root = .none,
-                .configs = .empty,
-            };
-        }
-
-        pub fn deinit(self: *Self) void {
-            self.nodes.deinit(self.gpa);
-            self.free.deinit(self.gpa);
-            self.open_stack.deinit(self.gpa);
-            self.configs.deinit(self.gpa);
-        }
-
-        pub fn clear(self: *Self) void {
-            self.nodes.clearRetainingCapacity();
-            self.free.clearRetainingCapacity();
-            self.open_stack.clearRetainingCapacity();
-            self.configs.clearRetainingCapacity();
-            self.root = .none;
-        }
-
-        /// Returns a non-generic view into the tree structure.
-        pub fn treeView(self: *Self) LayoutView {
-            return .{
-                .nodes = &self.nodes,
-                .free = &self.free,
-            };
-        }
-
-        fn insert(self: *Self) !Handle {
-            if (self.free.pop()) |handle| {
-                self.nodes.items[@intFromEnum(handle)] = .empty;
-                return handle;
-            }
-            try self.nodes.append(self.gpa, .empty);
-            return Handle.from(@intCast(self.nodes.items.len - 1));
-        }
-
-        pub fn open(self: *Self, config: Config) !Handle {
-            const parent_handle = self.open_stack.getLastOrNull() orelse .none;
-            const handle = try self.insert();
-
-            const node = self.getNode(handle);
-            node.parent = parent_handle;
-
-            if (parent_handle != .none) {
-                const parent = self.getNode(parent_handle);
-                if (parent.first_child == .none) {
-                    parent.first_child = handle;
-                    parent.last_child = handle;
-                } else {
-                    self.getNode(parent.last_child).next_sibling = handle;
-                    parent.last_child = handle;
-                }
-            } else {
-                self.root = handle;
-            }
-
-            try self.open_stack.append(self.gpa, handle);
-
-            const idx = @intFromEnum(handle);
-            if (idx >= self.configs.items.len) {
-                try self.configs.resize(self.gpa, self.nodes.items.len);
-            }
-            self.configs.items[idx] = config;
-
+    fn newNode(self: *Layout) !Handle {
+        if (self.free.pop()) |handle| {
+            self.nodes.items[@intFromEnum(handle)] = undefined;
             return handle;
         }
+        try self.nodes.append(self.gpa, undefined);
+        return @enumFromInt(self.nodes.items.len - 1);
+    }
 
-        pub fn close(self: *Self) void {
-            _ = self.open_stack.pop();
-        }
+    pub fn removeNode(self: *Layout, handle: Handle) !void {
+        self.getNode(handle).* = undefined;
+        try self.free.append(self.gpa, handle);
+    }
 
-        pub fn remove(self: *Self, handle: Handle) !void {
-            self.getNode(handle).* = undefined;
-            try self.free.append(self.gpa, handle);
-        }
+    pub fn open(self: *Layout, config: anytype) !Handle {
+        const Config = @TypeOf(config);
 
-        pub fn getNode(self: *const Self, handle: Handle) *Node {
-            return &self.nodes.items[@intFromEnum(handle)];
-        }
-
-        pub fn getBox(self: *const Self, handle: Handle) *Box {
-            return &self.getNode(handle).box;
-        }
-
-        pub fn getConfig(self: *const Self, handle: Handle) *Config {
-            return &self.configs.items[@intFromEnum(handle)];
-        }
-
-        pub fn children(self: *const Self, handle: Handle) ChildIterator {
-            return .{ .current = self.getNode(handle).first_child };
-        }
-
-        pub fn childCount(self: *const Self, handle: Handle) u32 {
-            var count: u32 = 0;
-            var iter = self.children(handle);
-            while (iter.next(self)) |_| count += 1;
-            return count;
-        }
-
-        fn calculateAxisSizing(self: *Self, axis: Axis) !void {
-            if (self.root == .none) return;
-
-            const view = self.treeView();
-
-            // Bottom-up pass: calculate min sizes
-            {
-                var stack: std.ArrayListUnmanaged(struct { Handle, bool }) = .empty;
-                defer stack.deinit(self.gpa);
-                try stack.append(self.gpa, .{ self.root, false });
-
-                while (stack.pop()) |frame| {
-                    const node_handle, const visited = frame;
-
-                    if (visited) {
-                        const config = self.getConfig(node_handle);
-                        const box = self.getBox(node_handle);
-                        switch (config.*) {
-                            inline else => |config_union| {
-                                @TypeOf(config_union).fitAxis(view, node_handle, config_union, axis);
-                            },
-                        }
-                        box.size.axis(axis).* = box.min_size.axis(axis).*;
-                    } else {
-                        try stack.append(self.gpa, .{ node_handle, true });
-                        var it = self.children(node_handle);
-                        while (it.next(self)) |child_handle| {
-                            try stack.append(self.gpa, .{ child_handle, false });
-                        }
-                    }
-                }
+        const vtable_wrapper = struct {
+            pub fn fitAxis(layout: *const Layout, handle: Handle, conf: *const anyopaque, axis: Axis) void {
+                Config.fitAxis(layout, handle, @ptrCast(@alignCast(conf)), axis);
             }
+            pub fn sizeAxis(layout: *const Layout, handle: Handle, conf: *const anyopaque, axis: Axis) void {
+                Config.sizeAxis(layout, handle, @ptrCast(@alignCast(conf)), axis);
+            }
+            pub fn position(layout: *const Layout, handle: Handle, conf: *const anyopaque) void {
+                Config.position(layout, handle, @ptrCast(@alignCast(conf)));
+            }
+        };
 
-            // Top-down pass: distribute sizes
-            {
-                var stack: std.ArrayListUnmanaged(Handle) = .empty;
-                defer stack.deinit(self.gpa);
-                try stack.append(self.gpa, self.root);
+        const conf = try self.gpa.create(@TypeOf(config));
+        conf.* = config;
 
-                while (stack.pop()) |parent_handle| {
-                    var it = self.children(parent_handle);
+        return self.openRaw(&.{
+            .fitAxis = vtable_wrapper.fitAxis,
+            .sizeAxis = vtable_wrapper.sizeAxis,
+            .position = vtable_wrapper.position,
+        }, conf);
+    }
+
+    pub fn openRaw(
+        self: *Layout,
+        vtable: *const Node.VTable,
+        config: *anyopaque,
+    ) !Handle {
+        const parent_handle = self.open_stack.getLastOrNull() orelse .none;
+        const handle = try self.newNode();
+
+        const node = self.getNode(handle);
+        node.* = .{
+            .parent = parent_handle,
+            .first_child = .none,
+            .last_child = .none,
+            .next_sibling = .none,
+
+            .box = .zero,
+
+            .config = config,
+            .vtable = vtable,
+        };
+
+        if (parent_handle != .none) {
+            const parent = self.getNode(parent_handle);
+            if (parent.first_child == .none) {
+                parent.first_child = handle;
+                parent.last_child = handle;
+            } else {
+                self.getNode(parent.last_child).next_sibling = handle;
+                parent.last_child = handle;
+            }
+        } else {
+            self.root = handle;
+        }
+
+        try self.open_stack.append(self.gpa, handle);
+
+        return handle;
+    }
+
+    pub fn close(self: *Layout) void {
+        _ = self.open_stack.pop();
+    }
+
+    fn calculateAxisSizing(self: *Layout, axis: Axis) !void {
+        if (self.root == .none) return;
+
+        // Bottom-up pass: calculate min sizes
+        {
+            var stack: std.ArrayListUnmanaged(struct { Handle, bool }) = .empty;
+            defer stack.deinit(self.gpa);
+            try stack.append(self.gpa, .{ self.root, false });
+
+            while (stack.pop()) |frame| {
+                const node_handle, const visited = frame;
+
+                if (visited) {
+                    const node = self.getNode(node_handle);
+                    const box = &node.box;
+
+                    node.vtable.fitAxis(self, node_handle, node.config, axis);
+                    box.size.axis(axis).* = box.min_size.axis(axis).*;
+                } else {
+                    try stack.append(self.gpa, .{ node_handle, true });
+                    var it = self.children(node_handle);
                     while (it.next(self)) |child_handle| {
-                        try stack.append(self.gpa, child_handle);
-                    }
-
-                    const config = self.getConfig(parent_handle);
-                    switch (config.*) {
-                        inline else => |config_union| {
-                            @TypeOf(config_union).sizeAxis(view, parent_handle, config_union, axis);
-                        },
+                        try stack.append(self.gpa, .{ child_handle, false });
                     }
                 }
             }
         }
 
-        pub fn calculateLayout(self: *Self) !void {
-            if (self.root == .none) return;
+        // Top-down pass: distribute sizes
+        {
+            var stack: std.ArrayListUnmanaged(Handle) = .empty;
+            defer stack.deinit(self.gpa);
+            try stack.append(self.gpa, self.root);
 
-            const view = self.treeView();
-
-            try self.calculateAxisSizing(.x);
-
-            // Adjustment pass
-            {
-                var stack: std.ArrayListUnmanaged(Handle) = .empty;
-                defer stack.deinit(self.gpa);
-                try stack.append(self.gpa, self.root);
-
-                while (stack.pop()) |parent_handle| {
-                    var it = self.children(parent_handle);
-                    while (it.next(self)) |child_handle| {
-                        try stack.append(self.gpa, child_handle);
-                    }
-
-                    const config = self.getConfig(parent_handle);
-                    switch (config.*) {
-                        inline else => |config_union| {
-                            if (@hasDecl(@TypeOf(config_union), "adjust"))
-                                @TypeOf(config_union).adjust(view, parent_handle, config_union);
-                        },
-                    }
+            while (stack.pop()) |parent_handle| {
+                var it = self.children(parent_handle);
+                while (it.next(self)) |child_handle| {
+                    try stack.append(self.gpa, child_handle);
                 }
-            }
-
-            try self.calculateAxisSizing(.y);
-
-            // Positioning pass
-            {
-                var stack: std.ArrayListUnmanaged(Handle) = .empty;
-                defer stack.deinit(self.gpa);
-                try stack.append(self.gpa, self.root);
-
-                while (stack.pop()) |parent_handle| {
-                    var it = self.children(parent_handle);
-                    while (it.next(self)) |child_handle| {
-                        try stack.append(self.gpa, child_handle);
-                    }
-
-                    const config = self.getConfig(parent_handle);
-                    switch (config.*) {
-                        inline else => |config_union| {
-                            @TypeOf(config_union).position(view, parent_handle, config_union);
-                        },
-                    }
-                }
+                const node = self.getNode(parent_handle);
+                node.vtable.sizeAxis(self, parent_handle, node.config, axis);
             }
         }
-    };
-}
+    }
+
+    pub fn calculateLayout(self: *Layout) !void {
+        if (self.root == .none) return;
+
+        try self.calculateAxisSizing(.x);
+        try self.calculateAxisSizing(.y);
+
+        {
+            var stack: std.ArrayListUnmanaged(Handle) = .empty;
+            defer stack.deinit(self.gpa);
+            try stack.append(self.gpa, self.root);
+
+            while (stack.pop()) |parent_handle| {
+                var it = self.children(parent_handle);
+                while (it.next(self)) |child_handle| {
+                    try stack.append(self.gpa, child_handle);
+                }
+                const node = self.getNode(parent_handle);
+                node.vtable.position(self, parent_handle, node.config);
+            }
+        }
+    }
+};
