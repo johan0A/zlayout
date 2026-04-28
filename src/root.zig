@@ -1,8 +1,3 @@
-const std = @import("std");
-const Allocator = std.mem.Allocator;
-
-pub const max_float = std.math.floatMax(f32);
-
 pub const Position = struct {
     x: f32,
     y: f32,
@@ -26,12 +21,20 @@ pub const Box = struct {
 
     preferred_size: Size,
     min_size: Size,
+    max_size: Size,
+
+    computed: struct {
+        fit: std.EnumArray(Axis, bool),
+        size: std.EnumArray(Axis, bool),
+    },
 
     pub const zero: Box = .{
         .pos = .{ .x = 0, .y = 0 },
         .size = .{ .width = 0, .height = 0 },
         .preferred_size = .{ .width = 0, .height = 0 },
         .min_size = .{ .width = 0, .height = 0 },
+        .max_size = .{ .width = std.math.floatMax(f32), .height = std.math.floatMax(f32) },
+        .computed = .{ .fit = .initFill(false), .size = .initFill(false) },
     };
 };
 
@@ -80,14 +83,50 @@ pub const Layout = struct {
         return &self.nodes.items[@intFromEnum(handle)];
     }
 
-    pub fn getPreferedSize(self: *const Layout, handle: Handle, axis: Axis) f32 {
+    pub fn getNodeMinSize(self: *const Layout, handle: Handle, axis: Axis) f32 {
         const node = self.getNode(handle);
-        node.vtable.sizeAxis(self, handle, node.config, axis);
+        if (!node.box.computed.fit.get(axis)) {
+            node.vtable.fitAxis(self, handle, node.config, axis);
+            node.box.computed.fit.set(axis, true);
+        }
+        return node.box.min_size.axis(axis).*;
+    }
+
+    pub fn getNodeMaxSize(self: *const Layout, handle: Handle, axis: Axis) f32 {
+        const node = self.getNode(handle);
+        if (!node.box.computed.fit.get(axis)) {
+            node.vtable.fitAxis(self, handle, node.config, axis);
+            node.box.computed.fit.set(axis, true);
+        }
+        return node.box.max_size.axis(axis).*;
+    }
+
+    pub fn getNodePreferedSize(self: *const Layout, handle: Handle, axis: Axis) f32 {
+        const node = self.getNode(handle);
+        if (!node.box.computed.fit.get(axis)) {
+            node.vtable.fitAxis(self, handle, node.config, axis);
+            node.box.computed.fit.set(axis, true);
+        }
+        return node.box.preferred_size.axis(axis).*;
+    }
+
+    pub fn getNodeSize(self: *const Layout, handle: Handle, axis: Axis) f32 {
+        const node = self.getNode(handle);
+        if (handle == .none) {
+            node.box.size.axis(axis).* = node.box.min_size.axis(axis).*;
+        } else {
+            const parent_hdl = node.parent;
+            const parent = self.getNode(parent_hdl);
+            if (!parent.box.computed.size.get(axis)) {
+                parent.vtable.sizeAxis(self, parent_hdl, parent.config, axis);
+                parent.box.computed.size.set(axis, true);
+            }
+        }
+        return node.box.size.axis(axis).*;
     }
 
     pub const ChildIterator = struct {
         current: Handle,
-
         pub fn next(self: *ChildIterator, layout: *const Layout) ?Handle {
             if (self.current == .none) return null;
             defer self.current = layout.getNode(self.current).next_sibling;
@@ -189,8 +228,6 @@ pub const Layout = struct {
     }
 
     fn calculateAxisSizing(self: *Layout, axis: Axis) !void {
-        if (self.root == .none) return;
-
         // Bottom-up pass: calculate min sizes
         {
             var stack: std.ArrayListUnmanaged(struct { Handle, bool }) = .empty;
@@ -201,11 +238,7 @@ pub const Layout = struct {
                 const node_handle, const visited = frame;
 
                 if (visited) {
-                    const node = self.getNode(node_handle);
-                    const box = &node.box;
-
-                    node.vtable.fitAxis(self, node_handle, node.config, axis);
-                    box.size.axis(axis).* = box.min_size.axis(axis).*;
+                    _ = self.getNodeMinSize(node_handle, axis);
                 } else {
                     try stack.append(self.gpa, .{ node_handle, true });
                     var it = self.children(node_handle);
@@ -222,13 +255,19 @@ pub const Layout = struct {
             defer stack.deinit(self.gpa);
             try stack.append(self.gpa, self.root);
 
+            const root = self.getNode(self.root);
+            root.box.size.axis(axis).* = root.box.min_size.axis(axis).*;
+
             while (stack.pop()) |parent_handle| {
                 var it = self.children(parent_handle);
                 while (it.next(self)) |child_handle| {
                     try stack.append(self.gpa, child_handle);
                 }
                 const node = self.getNode(parent_handle);
-                node.vtable.sizeAxis(self, parent_handle, node.config, axis);
+                if (!node.box.computed.size.get(axis)) {
+                    node.vtable.sizeAxis(self, parent_handle, node.config, axis);
+                    node.box.computed.size.set(axis, true);
+                }
             }
         }
     }
@@ -254,4 +293,15 @@ pub const Layout = struct {
             }
         }
     }
+
+    pub fn clear(self: *Layout) void {
+        self.nodes.clearRetainingCapacity();
+        self.free.clearRetainingCapacity();
+        self.root = .none;
+    }
 };
+
+const std = @import("std");
+const Allocator = std.mem.Allocator;
+
+pub const configs = @import("configs.zig");

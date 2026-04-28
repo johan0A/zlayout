@@ -48,7 +48,7 @@ pub const Padding = struct {
         return .{ .left = h, .right = h, .top = v, .bottom = v };
     }
 
-    fn axis(self: Padding, axis_: layout_mod.Axis) f32 {
+    fn axis(self: Padding, axis_: zlayout.Axis) f32 {
         return switch (axis_) {
             .x => self.left + self.right,
             .y => self.top + self.bottom,
@@ -65,9 +65,9 @@ pub const Flex = struct {
     child_alignment: ChildAlignment = .{},
     /// x => left to right
     /// y => top to bottom
-    axis: layout_mod.Axis = .x,
+    axis: zlayout.Axis = .x,
 
-    pub fn fitAxis(layout: *const Layout, handle: layout_mod.Handle, config: *const Flex, axis: layout_mod.Axis) void {
+    pub fn fitAxis(layout: *const Layout, handle: zlayout.Handle, config: *const Flex, axis: zlayout.Axis) void {
         const box = &layout.getNode(handle).box;
 
         const sizing = switch (axis) {
@@ -77,11 +77,11 @@ pub const Flex = struct {
 
         const min_size = box.min_size.axis(axis);
         const preferred_size = box.preferred_size.axis(axis);
+        const max_size = box.max_size.axis(axis);
 
         var it = layout.children(handle);
         while (it.next(layout)) |child_handle| {
-            const child = &layout.getNode(child_handle).box;
-            const child_min = child.min_size.axis(axis).*;
+            const child_min = layout.getNodeMinSize(child_handle, axis);
             if (config.axis == axis) {
                 min_size.* += child_min;
             } else {
@@ -101,9 +101,16 @@ pub const Flex = struct {
             .fixed => |s| s,
             .percent => @panic("TODO"),
         };
+
+        max_size.* = switch (sizing.type) {
+            .fit => min_size.*,
+            .grow => sizing.max,
+            .fixed => |s| s,
+            .percent => @panic("TODO"),
+        };
     }
 
-    pub fn sizeAxis(layout: *const Layout, handle: layout_mod.Handle, config: *const Flex, axis: layout_mod.Axis) void {
+    pub fn sizeAxis(layout: *const Layout, handle: zlayout.Handle, config: *const Flex, axis: zlayout.Axis) void {
         const parent = &layout.getNode(handle).box;
 
         const parent_size = parent.size.axis(axis).*;
@@ -114,10 +121,12 @@ pub const Flex = struct {
         while (it.next(layout)) |child_handle| {
             const child = &layout.getNode(child_handle).box;
             const child_size = child.size.axis(axis);
-            const child_preferred = child.preferred_size.axis(axis).*;
+            const child_min = layout.getNodeMinSize(child_handle, axis);
+            const child_preferred = layout.getNodePreferedSize(child_handle, axis);
 
-            if (config.axis != axis and child_size.* < child_preferred) {
-                const child_min = child.min_size.axis(axis).*;
+            if (config.axis == axis) {
+                child_size.* = child_min;
+            } else if (child_size.* < child_preferred) {
                 child_size.* = @max(child_min, @min(available, child_preferred));
             }
         }
@@ -144,9 +153,9 @@ pub const Flex = struct {
             var it2 = layout.children(handle);
             while (it2.next(layout)) |child_handle| {
                 const child = &layout.getNode(child_handle).box;
-
                 const child_size = child.size.axis(axis).*;
-                const child_preferred = child.preferred_size.axis(axis).*;
+
+                const child_preferred = layout.getNodePreferedSize(child_handle, axis);
 
                 if (child_size >= child_preferred) continue;
                 growable_count += 1;
@@ -177,7 +186,7 @@ pub const Flex = struct {
         }
     }
 
-    pub fn position(layout: *const Layout, handle: layout_mod.Handle, config: *const Flex) void {
+    pub fn position(layout: *const Layout, handle: zlayout.Handle, config: *const Flex) void {
         const parent = &layout.getNode(handle).box;
         const direction = config.axis;
 
@@ -220,7 +229,80 @@ pub const Flex = struct {
     }
 };
 
+pub const Grid = struct {
+    fn cellSize(layout: *const Layout, handle: zlayout.Handle, axis: zlayout.Axis) f32 {
+        var max_size: f32 = 0;
+        var it = layout.children(handle);
+        while (it.next(layout)) |child_handle| {
+            const child_min = layout.getNodeMinSize(child_handle, axis);
+            max_size = @max(max_size, child_min);
+        }
+        return max_size;
+    }
+
+    pub fn fitAxis(layout: *const Layout, handle: zlayout.Handle, config: *const Grid, axis: zlayout.Axis) void {
+        _ = config;
+        const box = &layout.getNode(handle).box;
+        const min_size = box.min_size.axis(axis);
+        const preferred_size = box.preferred_size.axis(axis);
+        const max_size = box.max_size.axis(axis);
+
+        const cell = cellSize(layout, handle, axis);
+        const count: f32 = @floatFromInt(layout.childCount(handle));
+
+        switch (axis) {
+            .x => {
+                min_size.* = cell;
+                preferred_size.* = cell * count;
+                max_size.* = cell * count;
+            },
+            .y => {
+                const cell_x = cellSize(layout, handle, .x);
+                const width = box.size.axis(.x).*;
+                const cols: f32 = if (cell_x > 0 and width >= cell_x) @floor(width / cell_x) else 1;
+                const rows = @ceil(count / cols);
+                min_size.* = cell * rows;
+                preferred_size.* = cell * rows;
+                max_size.* = cell * rows;
+            },
+        }
+    }
+
+    pub fn sizeAxis(layout: *const Layout, handle: zlayout.Handle, config: *const Grid, axis: zlayout.Axis) void {
+        _ = config;
+        const cell = cellSize(layout, handle, axis);
+
+        var it = layout.children(handle);
+        while (it.next(layout)) |child_handle| {
+            const child = &layout.getNode(child_handle).box;
+            child.size.axis(axis).* = cell;
+        }
+    }
+
+    pub fn position(layout: *const Layout, handle: zlayout.Handle, config: *const Grid) void {
+        _ = config;
+        const parent = &layout.getNode(handle).box;
+
+        const cell_x = cellSize(layout, handle, .x);
+        const cell_y = cellSize(layout, handle, .y);
+
+        if (cell_x <= 0 or cell_y <= 0) return;
+
+        const cols_per_row: u32 = @max(1, @as(u32, @intFromFloat(@floor(parent.size.width / cell_x))));
+
+        var i: u32 = 0;
+        var it = layout.children(handle);
+        while (it.next(layout)) |child_handle| : (i += 1) {
+            const child = &layout.getNode(child_handle).box;
+            const row = i / cols_per_row;
+            const col = i % cols_per_row;
+            child.pos.x = parent.pos.x + @as(f32, @floatFromInt(col)) * cell_x;
+            child.pos.y = parent.pos.y + @as(f32, @floatFromInt(row)) * cell_y;
+        }
+    }
+};
+
 const std = @import("std");
 
-const layout_mod = @import("layout.zig");
-const Layout = layout_mod.Layout;
+const zlayout = @import("root.zig");
+const Layout = zlayout.Layout;

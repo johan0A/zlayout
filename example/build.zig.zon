@@ -1,17 +1,16 @@
 .{
-    .name = .zlayout,
+    .name = .example,
     .version = "0.0.1",
     .dependencies = .{
         .raylib_zig = .{
             .url = "git+https://github.com/raylib-zig/raylib-zig#a93d7f04aeeb138efc0a08b406aad74cdea17c1c",
             .hash = "raylib_zig-5.6.0-dev-KE8REJ9mBQC9yBwvG5aBLUgMaGVGyzbrpyGZNUyzwvUI",
         },
+        .zlayout = .{
+            .path = "../",
+        },
     },
-    .minimum_zig_version = "0.15.2",
-    .paths = .{
-        "src",
-        "build.zig",
-        "build.zig.zon",
-    },
-    .fingerprint = 0x5e8c9a5af1912abb,
+    .minimum_zig_version = "0.16.0",
+    .paths = .{""},
+    .fingerprint = 0x6eec9b9f8f281b85,
 }

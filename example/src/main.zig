@@ -1,25 +1,24 @@
 const std = @import("std");
 const rl = @import("raylib");
-const layout_mod = @import("layout.zig");
-const configs = @import("configs.zig");
-const renderer_mod = @import("renderer.zig");
+const zlayout = @import("zlayout");
+const configs = zlayout.configs;
+const renderer = @import("renderer.zig");
 
-pub const Layout = layout_mod.Layout;
-
-pub fn main() !void {
-    var gpa: std.heap.DebugAllocator(.{}) = .init;
-    defer _ = gpa.deinit();
+const Layout = zlayout.Layout;
+pub fn main(init: std.process.Init) !void {
+    const gpa = init.arena.allocator();
 
     rl.setConfigFlags(.{ .window_resizable = true });
 
     rl.initWindow(1200, 800, "Layout Demo");
     defer rl.closeWindow();
 
+    var ui: Layout = .init(gpa);
+
     while (!rl.windowShouldClose()) {
-        var ui = Layout.init(gpa.allocator());
-        // defer ui.deinit();
         try demoLayout(&ui, @floatFromInt(rl.getRenderWidth()), @floatFromInt(rl.getRenderHeight()));
         try ui.calculateLayout();
+        defer ui.clear();
 
         rl.beginDrawing();
         rl.clearBackground(rl.Color.init(20, 20, 20, 255));
@@ -27,7 +26,7 @@ pub fn main() !void {
         const mouse_x = rl.getMouseX();
         const mouse_y = rl.getMouseY();
 
-        renderer_mod.render(&ui, mouse_x, mouse_y);
+        renderer.render(&ui, mouse_x, mouse_y);
 
         rl.endDrawing();
     }
@@ -138,8 +137,8 @@ fn demoLayout(ui: *Layout, width: f32, height: f32) !void {
             });
             defer ui.close();
 
-            for ([_][]const u8{ "Dashboard", "Analytics", "Reports", "Settings", "Users", "Billing", "Help", "Logout" }) |label| {
-                _ = label; // autofix
+            // for ([_][]const u8{ "Dashboard", "Analytics", "Reports", "Settings", "Users", "Billing", "Help", "Logout" }) |label| {
+            for (0..3) |_| {
                 _ = try ui.open(configs.Flex{
                     .sizing = .{ .width = .grow, .height = .fixed(36) },
                     .padding = .symmetric(12, 8),
@@ -157,6 +156,19 @@ fn demoLayout(ui: *Layout, width: f32, height: f32) !void {
                 .child_gap = 20,
             });
             defer ui.close();
+
+            {
+                _ = try ui.open(configs.Grid{});
+                defer ui.close();
+
+                for (0..10) |_| {
+                    _ = try ui.open(configs.Flex{
+                        .sizing = .{ .width = .fixed(36), .height = .fixed(62) },
+                        .child_alignment = .{ .y = .center },
+                    });
+                    defer ui.close();
+                }
+            }
 
             {
                 // _ = try ui.open(configs.Flex{

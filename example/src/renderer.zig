@@ -1,12 +1,12 @@
 const std = @import("std");
 const rl = @import("raylib");
-const layout_mod = @import("layout.zig");
-const Layout = @import("main.zig").Layout;
-const Node = layout_mod.Node;
-const configs = @import("configs.zig");
+const zlayout = @import("zlayout");
+const Layout = zlayout.Layout;
+const Node = zlayout.Node;
+const configs = zlayout.configs;
 
-const SizingAxis = layout_mod.SizingAxis;
-const Padding = layout_mod.Padding;
+const SizingAxis = zlayout.SizingAxis;
+const Padding = zlayout.Padding;
 
 const depth_colors = [_]rl.Color{
     rl.Color.init(66, 135, 245, 255), // Blue
@@ -27,7 +27,7 @@ const type_colors = struct {
 };
 
 pub fn render(layout: *const Layout, mouse_x: i32, mouse_y: i32) void {
-    var stack: [256]layout_mod.Handle = undefined;
+    var stack: [256]zlayout.Handle = undefined;
     var stack_len: usize = 1;
     stack[0] = layout.root;
 
@@ -38,10 +38,10 @@ pub fn render(layout: *const Layout, mouse_x: i32, mouse_y: i32) void {
 
         const fill_color = getDepthColor(layout, handle);
 
-        const x: i32 = @intFromFloat(bb.pos.x);
-        const y: i32 = @intFromFloat(bb.pos.y);
-        const w: i32 = @intFromFloat(@max(4, bb.size.width));
-        const h: i32 = @intFromFloat(@max(4, bb.size.height));
+        const x: i32 = @trunc(bb.pos.x);
+        const y: i32 = @trunc(bb.pos.y);
+        const w: i32 = @trunc(@max(4, bb.size.width));
+        const h: i32 = @trunc(@max(4, bb.size.height));
 
         rl.drawRectangle(x, y, w, h, fill_color);
 
@@ -60,7 +60,7 @@ pub fn render(layout: *const Layout, mouse_x: i32, mouse_y: i32) void {
         }
 
         // Push children in reverse order so they render left-to-right
-        var children: [256]layout_mod.Handle = undefined;
+        var children: [256]zlayout.Handle = undefined;
         var child_count: usize = 0;
         var it = layout.children(handle);
         while (it.next(layout)) |child_handle| {
@@ -89,12 +89,12 @@ pub fn render(layout: *const Layout, mouse_x: i32, mouse_y: i32) void {
     }
 }
 
-fn getDepthColor(layout: *const Layout, handle: layout_mod.Handle) rl.Color {
+fn getDepthColor(layout: *const Layout, handle: zlayout.Handle) rl.Color {
     const depth = calculateDepth(layout, handle);
     return depth_colors[depth % depth_colors.len];
 }
 
-fn calculateDepth(layout: *const Layout, handle: layout_mod.Handle) u32 {
+fn calculateDepth(layout: *const Layout, handle: zlayout.Handle) u32 {
     var depth: u32 = 0;
     var parent = layout.getNode(handle).parent;
     while (parent != .none) {
@@ -104,13 +104,13 @@ fn calculateDepth(layout: *const Layout, handle: layout_mod.Handle) u32 {
     return depth;
 }
 
-pub fn findNodeAt(layout: *const Layout, x: i32, y: i32) ?layout_mod.Handle {
+pub fn findNodeAt(layout: *const Layout, x: i32, y: i32) ?zlayout.Handle {
     const fx: f32 = @floatFromInt(x);
     const fy: f32 = @floatFromInt(y);
 
-    var result: ?layout_mod.Handle = null;
+    var result: ?zlayout.Handle = null;
 
-    var stack: [256]layout_mod.Handle = undefined;
+    var stack: [256]zlayout.Handle = undefined;
     var stack_len: usize = 1;
     stack[0] = layout.root;
 
@@ -136,7 +136,7 @@ pub fn findNodeAt(layout: *const Layout, x: i32, y: i32) ?layout_mod.Handle {
     return result;
 }
 
-fn drawNodeTooltip(layout: *const Layout, node: *const Node, handle: layout_mod.Handle, x: i32, y: i32) void {
+fn drawNodeTooltip(layout: *const Layout, node: *const Node, handle: zlayout.Handle, x: i32, y: i32) void {
     var buff: [2048]u8 = undefined;
     var fba = std.heap.FixedBufferAllocator.init(&buff);
     const gpa = fba.allocator();
