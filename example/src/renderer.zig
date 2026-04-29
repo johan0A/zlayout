@@ -5,25 +5,22 @@ const Layout = zlayout.Layout;
 const Node = zlayout.Node;
 const configs = zlayout.configs;
 
-const SizingAxis = zlayout.SizingAxis;
-const Padding = zlayout.Padding;
-
 const depth_colors = [_]rl.Color{
-    rl.Color.init(66, 135, 245, 255), // Blue
-    rl.Color.init(102, 187, 106, 255), // Green
-    rl.Color.init(255, 167, 38, 255), // Orange
-    rl.Color.init(171, 71, 188, 255), // Purple
-    rl.Color.init(239, 83, 80, 255), // Red
-    rl.Color.init(38, 198, 218, 255), // Cyan
-    rl.Color.init(255, 238, 88, 255), // Yellow
-    rl.Color.init(141, 110, 99, 255), // Brown
+    .init(66, 135, 245, 255), // Blue
+    .init(102, 187, 106, 255), // Green
+    .init(255, 167, 38, 255), // Orange
+    .init(171, 71, 188, 255), // Purple
+    .init(239, 83, 80, 255), // Red
+    .init(38, 198, 218, 255), // Cyan
+    .init(255, 238, 88, 255), // Yellow
+    .init(141, 110, 99, 255), // Brown
 };
 
 const type_colors = struct {
-    const flex = rl.Color.init(66, 135, 245, 255); // Blue
-    const text = rl.Color.init(102, 187, 106, 255); // Green
-    const scroll = rl.Color.init(255, 167, 38, 255); // Orange
-    const grid = rl.Color.init(171, 71, 188, 255); // Purple
+    const flex: rl.Color = .init(66, 135, 245, 255); // Blue
+    const text: rl.Color = .init(102, 187, 106, 255); // Green
+    const scroll: rl.Color = .init(255, 167, 38, 255); // Orange
+    const grid: rl.Color = .init(171, 71, 188, 255); // Purple
 };
 
 pub fn render(layout: *const Layout, mouse_x: i32, mouse_y: i32) void {

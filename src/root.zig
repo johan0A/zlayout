@@ -49,6 +49,7 @@ pub const Node = struct {
 
     box: Box,
 
+    config_tag: u32,
     config: *anyopaque,
     vtable: *const VTable,
 
@@ -60,10 +61,10 @@ pub const Node = struct {
 };
 
 pub const Layout = struct {
-    nodes: std.ArrayListUnmanaged(Node),
-    free: std.ArrayListUnmanaged(Handle),
+    nodes: std.ArrayList(Node),
+    free: std.ArrayList(Handle),
 
-    open_stack: std.ArrayListUnmanaged(Handle),
+    open_stack: std.ArrayList(Handle),
 
     root: Handle,
 
@@ -159,7 +160,7 @@ pub const Layout = struct {
         try self.free.append(self.gpa, handle);
     }
 
-    pub fn open(self: *Layout, config: anytype) !Handle {
+    pub fn open(self: *Layout, config_tag: u32, config: anytype) !Handle {
         const Config = @TypeOf(config);
 
         const vtable_wrapper = struct {
@@ -181,12 +182,13 @@ pub const Layout = struct {
             .fitAxis = vtable_wrapper.fitAxis,
             .sizeAxis = vtable_wrapper.sizeAxis,
             .position = vtable_wrapper.position,
-        }, conf);
+        }, config_tag, conf);
     }
 
     pub fn openRaw(
         self: *Layout,
         vtable: *const Node.VTable,
+        config_tag: u32,
         config: *anyopaque,
     ) !Handle {
         const parent_handle = self.open_stack.getLastOrNull() orelse .none;
@@ -201,6 +203,7 @@ pub const Layout = struct {
 
             .box = .zero,
 
+            .config_tag = config_tag,
             .config = config,
             .vtable = vtable,
         };
@@ -230,7 +233,7 @@ pub const Layout = struct {
     fn calculateAxisSizing(self: *Layout, axis: Axis) !void {
         // Bottom-up pass: calculate min sizes
         {
-            var stack: std.ArrayListUnmanaged(struct { Handle, bool }) = .empty;
+            var stack: std.ArrayList(struct { Handle, bool }) = .empty;
             defer stack.deinit(self.gpa);
             try stack.append(self.gpa, .{ self.root, false });
 
@@ -251,7 +254,7 @@ pub const Layout = struct {
 
         // Top-down pass: distribute sizes
         {
-            var stack: std.ArrayListUnmanaged(Handle) = .empty;
+            var stack: std.ArrayList(Handle) = .empty;
             defer stack.deinit(self.gpa);
             try stack.append(self.gpa, self.root);
 
@@ -279,7 +282,7 @@ pub const Layout = struct {
         try self.calculateAxisSizing(.y);
 
         {
-            var stack: std.ArrayListUnmanaged(Handle) = .empty;
+            var stack: std.ArrayList(Handle) = .empty;
             defer stack.deinit(self.gpa);
             try stack.append(self.gpa, self.root);
 
