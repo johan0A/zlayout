@@ -69,10 +69,12 @@ pub const Layout = struct {
     root: Handle,
 
     gpa: std.mem.Allocator,
+    arena: std.heap.ArenaAllocator,
 
     pub fn init(gpa: Allocator) Layout {
         return .{
             .gpa = gpa,
+            .arena = .init(gpa),
             .nodes = .empty,
             .free = .empty,
             .open_stack = .empty,
@@ -175,7 +177,7 @@ pub const Layout = struct {
             }
         };
 
-        const conf = try self.gpa.create(@TypeOf(config));
+        const conf = try self.arena.allocator().create(@TypeOf(config));
         conf.* = config;
 
         return self.openRaw(&.{
@@ -300,6 +302,14 @@ pub const Layout = struct {
     pub fn clear(self: *Layout) void {
         self.nodes.clearRetainingCapacity();
         self.free.clearRetainingCapacity();
+        self.arena.reset(.retain_capacity);
+        self.root = .none;
+    }
+
+    pub fn deinit(self: *Layout) void {
+        self.nodes.deinit(self.gpa);
+        self.free.deinit(self.gpa);
+        self.arena.deinit();
         self.root = .none;
     }
 };
